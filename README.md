@@ -1,36 +1,104 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DNN Visualizer
+
+An interactive web application for understanding deep neural networks through real-time visualization.
+
+## Features
+
+- **Interactive Data Points**: Click to add, drag to move, right-click to delete data points
+- **Real-time Training**: Watch the network learn and adapt in real-time
+- **Two Modes**:
+  - **Regression**: Network learns to fit a curve through your data points
+  - **Classification**: Network learns to separate points into different classes
+- **Customizable Architecture**:
+  - Adjust number of layers (1-5)
+  - Configure neurons per layer (1-32)
+  - Choose activation functions (ReLU, Sigmoid, Tanh, Linear, Softmax)
+- **Hyperparameter Control**:
+  - Learning rate (0.0001 - 1.0)
+  - Training epochs per update (1-100)
+- **Live Visualization**:
+  - Regression: See the prediction curve adapt to your data
+  - Classification: See decision boundaries form in real-time
+- **Auto-train Mode**: Continuously train the network as you adjust parameters
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+ and npm
+
+### Installation
+
+```bash
+npm install
+```
+
+### Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+```
 
-## Learn More
+## How to Use
 
-To learn more about Next.js, take a look at the following resources:
+1. **Add Data Points**:
+   - Click on the canvas to add data points
+   - Drag points to move them
+   - Right-click to delete points
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **Configure Network**:
+   - Adjust layers, neurons, and activations in the left panel
+   - Set learning rate and epochs
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. **Train**:
+   - Click "Train" for manual training
+   - Enable "Auto-train" for continuous training
+   - Watch the loss decrease and predictions improve
 
-## Deploy on Vercel
+4. **Experiment**:
+   - Try different architectures
+   - Compare activation functions
+   - See how learning rate affects training
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Technical Details
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Framework**: Next.js 14+ with App Router
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **Visualization**: HTML5 Canvas + Recharts
+- **Neural Network**: Custom TypeScript implementation with:
+  - Forward and backward propagation
+  - Multiple activation functions
+  - MSE and Cross-Entropy loss functions
+  - Gradient descent optimization
+
+## Project Structure
+
+```
+dnn-visualizer/
+├── app/              # Next.js app directory
+│   ├── page.tsx      # Main application page
+│   └── layout.tsx    # Root layout
+├── components/       # React components
+│   ├── DataCanvas.tsx
+│   ├── ParameterControls.tsx
+│   └── Chart.tsx
+└── lib/              # Core library
+    ├── neural-network.ts
+    ├── activations.ts
+    ├── losses.ts
+    └── types.ts
+```
+
+## License
+
+This project is for educational purposes.
