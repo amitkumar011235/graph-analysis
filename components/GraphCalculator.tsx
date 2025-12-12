@@ -248,6 +248,11 @@ export default function GraphCalculator() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [viewStart, setViewStart] = useState({ xMin: -10, xMax: 10, yMin: -10, yMax: 10 });
+  
+  // Animation state for parameters
+  const [animatingParams, setAnimatingParams] = useState<Set<string>>(new Set());
+  const [animationDirections, setAnimationDirections] = useState<Record<string, 1 | -1>>({});
+  const animationSpeed = 0.1; // Value change per frame
 
   const width = 700;
   const height = 700;
@@ -316,6 +321,51 @@ export default function GraphCalculator() {
     });
     return values;
   }, [parameters]);
+
+  // Toggle parameter animation
+  const toggleAnimation = useCallback((paramName: string) => {
+    setAnimatingParams(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(paramName)) {
+        newSet.delete(paramName);
+      } else {
+        newSet.add(paramName);
+        // Initialize direction if not set
+        setAnimationDirections(dirs => ({
+          ...dirs,
+          [paramName]: dirs[paramName] || 1
+        }));
+      }
+      return newSet;
+    });
+  }, []);
+
+  // Animation loop
+  useEffect(() => {
+    if (animatingParams.size === 0) return;
+
+    const intervalId = setInterval(() => {
+      setParameters(prev => prev.map(param => {
+        if (!animatingParams.has(param.name)) return param;
+
+        const direction = animationDirections[param.name] || 1;
+        let newValue = param.value + animationSpeed * direction;
+
+        // Bounce at boundaries
+        if (newValue >= param.max) {
+          newValue = param.max;
+          setAnimationDirections(dirs => ({ ...dirs, [param.name]: -1 }));
+        } else if (newValue <= param.min) {
+          newValue = param.min;
+          setAnimationDirections(dirs => ({ ...dirs, [param.name]: 1 }));
+        }
+
+        return { ...param, value: Math.round(newValue * 100) / 100 };
+      }));
+    }, 50); // 20 FPS
+
+    return () => clearInterval(intervalId);
+  }, [animatingParams, animationDirections, animationSpeed]);
 
   // Convert data coordinates to canvas coordinates
   const dataToCanvas = useCallback((x: number, y: number) => {
@@ -705,7 +755,30 @@ export default function GraphCalculator() {
                 {displayedParameters.map((param) => (
                   <div key={param.name} className="bg-gray-50 p-2 rounded-md border border-gray-200">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-blue-600">{param.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-blue-600">{param.name}</span>
+                        {/* Play/Pause animation button */}
+                        <button
+                          onClick={() => toggleAnimation(param.name)}
+                          className={`w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
+                            animatingParams.has(param.name)
+                              ? 'bg-blue-500 text-white hover:bg-blue-600'
+                              : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                          }`}
+                          title={animatingParams.has(param.name) ? 'Pause animation' : 'Play animation'}
+                        >
+                          {animatingParams.has(param.name) ? (
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                              <rect x="6" y="4" width="4" height="16" />
+                              <rect x="14" y="4" width="4" height="16" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                       <input
                         type="number"
                         value={param.value}
@@ -721,19 +794,21 @@ export default function GraphCalculator() {
                         step="0.1"
                       />
                     </div>
-                    <input
-                      type="range"
-                      min={param.min}
-                      max={param.max}
-                      step="0.1"
-                      value={param.value}
-                      onChange={(e) => {
-                        setParameters(prev => prev.map(p => 
-                          p.name === param.name ? { ...p, value: parseFloat(e.target.value) } : p
-                        ));
-                      }}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={param.min}
+                        max={param.max}
+                        step="0.1"
+                        value={param.value}
+                        onChange={(e) => {
+                          setParameters(prev => prev.map(p => 
+                            p.name === param.name ? { ...p, value: parseFloat(e.target.value) } : p
+                          ));
+                        }}
+                        className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                      />
+                    </div>
                     <div className="flex justify-between text-xs text-gray-400 mt-1">
                       <button
                         onClick={() => setParameters(prev => prev.map(p => 
