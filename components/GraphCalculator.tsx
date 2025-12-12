@@ -1,6 +1,15 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import {
+  findIntersections,
+  findRoots,
+  findMinMax,
+  calculateDerivative,
+  calculateIntegral,
+  findCriticalPoints,
+  type Expression as AnalysisExpression,
+} from '../lib/graph-analysis';
 
 interface Expression {
   id: string;
@@ -15,6 +24,40 @@ interface Parameter {
   value: number;
   min: number;
   max: number;
+}
+
+interface AnalysisOptions {
+  showIntersections: boolean;
+  showCoordinates: boolean;
+  showTable: boolean;
+  showDataPoints: boolean;
+  showMinMax: boolean;
+}
+
+interface CalculusOptions {
+  showDerivative: boolean;
+  showIntegral: boolean;
+  showCriticalPoints: boolean;
+  selectedExpression: string | null; // For single expression calculus
+}
+
+interface DataPoint {
+  x: number;
+  y: number;
+  label?: string;
+}
+
+interface IntersectionPoint {
+  x: number;
+  y: number;
+  expr1: string;
+  expr2: string;
+}
+
+interface CriticalPoint {
+  x: number;
+  y: number;
+  type: 'max' | 'min' | 'inflection';
 }
 
 const COLORS = [
@@ -254,6 +297,30 @@ export default function GraphCalculator() {
   const [animationDirections, setAnimationDirections] = useState<Record<string, 1 | -1>>({});
   const animationSpeed = 0.1; // Value change per frame
 
+  // Analysis and calculus state
+  const [analysisOptions, setAnalysisOptions] = useState<AnalysisOptions>({
+    showIntersections: false,
+    showCoordinates: false,
+    showTable: false,
+    showDataPoints: false,
+    showMinMax: false,
+  });
+  const [calculusOptions, setCalculusOptions] = useState<CalculusOptions>({
+    showDerivative: false,
+    showIntegral: false,
+    showCriticalPoints: false,
+    selectedExpression: null,
+  });
+  const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
+  const [hoveredPoint, setHoveredPoint] = useState<{x: number, y: number} | null>(null);
+  const [intersectionPoints, setIntersectionPoints] = useState<IntersectionPoint[]>([]);
+  const [criticalPoints, setCriticalPoints] = useState<CriticalPoint[]>([]);
+  const [showTableModal, setShowTableModal] = useState(false);
+  const [tableExpression, setTableExpression] = useState<string | null>(null);
+  const [tableRange, setTableRange] = useState({ min: -5, max: 5, step: 0.5 });
+  const [tableData, setTableData] = useState<Array<{x: number, y: number}>>([]);
+  const [addDataPointMode, setAddDataPointMode] = useState(false);
+
   const width = 700;
   const height = 700;
   const padding = 50;
@@ -321,6 +388,113 @@ export default function GraphCalculator() {
     });
     return values;
   }, [parameters]);
+
+  // Calculate intersection points when enabled
+  const computedIntersections = useMemo(() => {
+    if (!analysisOptions.showIntersections) return [];
+    
+    const visibleExprs = expressions.filter(e => e.visible && e.text.trim());
+    if (visibleExprs.length < 2) return [];
+    
+    const intersections: IntersectionPoint[] = [];
+    
+    // Find intersections between all pairs of visible expressions
+    for (let i = 0; i < visibleExprs.length; i++) {
+      for (let j = i + 1; j < visibleExprs.length; j++) {
+        const expr1 = visibleExprs[i];
+        const expr2 = visibleExprs[j];
+        
+        // Get expression values for dependencies
+        const expr1Values: Record<string, number> = {};
+        const expr2Values: Record<string, number> = {};
+        
+        // Evaluate all expressions to get dependency values
+        const allValues = evaluateAllExpressions(expressions, 0, paramValues);
+        Object.keys(allValues).forEach(key => {
+          if (allValues[key] !== null) {
+            expr1Values[key] = allValues[key]!;
+            expr2Values[key] = allValues[key]!;
+          }
+        });
+        
+        const points = findIntersections(
+          expr1.text,
+          expr2.text,
+          xMin,
+          xMax,
+          paramValues,
+          expr1Values,
+          expr2Values
+        );
+        
+        points.forEach(p => {
+          intersections.push({
+            x: p.x,
+            y: p.y,
+            expr1: expr1.label,
+            expr2: expr2.label,
+          });
+        });
+      }
+    }
+    
+    return intersections;
+  }, [analysisOptions.showIntersections, expressions, xMin, xMax, paramValues]);
+
+  // Calculate critical points when enabled
+  const computedCriticalPoints = useMemo(() => {
+    if (!calculusOptions.showCriticalPoints || !calculusOptions.selectedExpression) return [];
+    
+    const expr = expressions.find(e => e.label.toLowerCase() === calculusOptions.selectedExpression?.toLowerCase());
+    if (!expr || !expr.text.trim()) return [];
+    
+    // Get expression values for dependencies
+    const exprValues: Record<string, number> = {};
+    const allValues = evaluateAllExpressions(expressions, 0, paramValues);
+    Object.keys(allValues).forEach(key => {
+      if (allValues[key] !== null) {
+        exprValues[key] = allValues[key]!;
+      }
+    });
+    
+    const points = findCriticalPoints(expr.text, xMin, xMax, paramValues, exprValues);
+    
+    return points.map(p => ({
+      x: p.x,
+      y: p.y,
+      type: p.type,
+    }));
+  }, [calculusOptions.showCriticalPoints, calculusOptions.selectedExpression, expressions, xMin, xMax, paramValues]);
+
+  // Calculate min/max points when enabled
+  const computedMinMax = useMemo(() => {
+    if (!analysisOptions.showMinMax) return [];
+    
+    const visibleExprs = expressions.filter(e => e.visible && e.text.trim());
+    const allMinMax: Array<{x: number, y: number, type: 'min' | 'max', expr: string}> = [];
+    
+    visibleExprs.forEach(expr => {
+      const exprValues: Record<string, number> = {};
+      const allValues = evaluateAllExpressions(expressions, 0, paramValues);
+      Object.keys(allValues).forEach(key => {
+        if (allValues[key] !== null) {
+          exprValues[key] = allValues[key]!;
+        }
+      });
+      
+      const points = findMinMax(expr.text, xMin, xMax, paramValues, exprValues);
+      points.forEach(p => {
+        allMinMax.push({
+          x: p.x,
+          y: p.y,
+          type: p.type,
+          expr: expr.label,
+        });
+      });
+    });
+    
+    return allMinMax;
+  }, [analysisOptions.showMinMax, expressions, xMin, xMax, paramValues]);
 
   // Toggle parameter animation
   const toggleAnimation = useCallback((paramName: string) => {
@@ -537,6 +711,197 @@ export default function GraphCalculator() {
       ctx.stroke();
     });
 
+    // Draw integral area (must be before derivative to show under it)
+    if (calculusOptions.showIntegral && calculusOptions.selectedExpression) {
+      const expr = expressions.find(e => e.label.toLowerCase() === calculusOptions.selectedExpression?.toLowerCase());
+      if (expr && expr.text.trim()) {
+        const exprValues: Record<string, number> = {};
+        const allValues = evaluateAllExpressions(expressions, 0, paramValues);
+        Object.keys(allValues).forEach(key => {
+          if (allValues[key] !== null) {
+            exprValues[key] = allValues[key]!;
+          }
+        });
+
+        ctx.fillStyle = expr.color + '40'; // Semi-transparent
+        ctx.beginPath();
+        const resolution = (width - 2 * padding) * 2;
+        let pathStarted = false;
+        
+        for (let i = 0; i <= resolution; i++) {
+          const x = xMin + (i / resolution) * (xMax - xMin);
+          const y = evaluateExpression(expr.text, x, paramValues, exprValues);
+          
+          if (y !== null && y >= yMin && y <= yMax) {
+            const canvas = dataToCanvas(x, y);
+            const axisY = dataToCanvas(x, 0).y;
+            
+            if (!pathStarted) {
+              ctx.moveTo(canvas.x, axisY);
+              pathStarted = true;
+            }
+            ctx.lineTo(canvas.x, canvas.y);
+          }
+        }
+        
+        // Close path to x-axis
+        if (pathStarted) {
+          const lastX = xMax;
+          const lastCanvas = dataToCanvas(lastX, 0);
+          ctx.lineTo(lastCanvas.x, lastCanvas.y);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    }
+
+    // Draw derivative curve
+    if (calculusOptions.showDerivative && calculusOptions.selectedExpression) {
+      const expr = expressions.find(e => e.label.toLowerCase() === calculusOptions.selectedExpression?.toLowerCase());
+      if (expr && expr.text.trim()) {
+        const exprValues: Record<string, number> = {};
+        const allValues = evaluateAllExpressions(expressions, 0, paramValues);
+        Object.keys(allValues).forEach(key => {
+          if (allValues[key] !== null) {
+            exprValues[key] = allValues[key]!;
+          }
+        });
+
+        ctx.strokeStyle = '#8b5cf6'; // Purple for derivative
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+
+        const resolution = (width - 2 * padding) * 2;
+        let started = false;
+
+        for (let i = 0; i <= resolution; i++) {
+          const x = xMin + (i / resolution) * (xMax - xMin);
+          const deriv = calculateDerivative(expr.text, x, paramValues, exprValues);
+
+          if (deriv !== null && deriv >= yMin - (yMax - yMin) && deriv <= yMax + (yMax - yMin)) {
+            const canvas = dataToCanvas(x, deriv);
+
+            if (!started) {
+              ctx.moveTo(canvas.x, canvas.y);
+              started = true;
+            } else {
+              ctx.lineTo(canvas.x, canvas.y);
+            }
+          } else {
+            started = false;
+          }
+        }
+
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // Draw intersection points
+    if (analysisOptions.showIntersections) {
+      computedIntersections.forEach(point => {
+        const canvas = dataToCanvas(point.x, point.y);
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(canvas.x, canvas.y, 6, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Label
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(`(${point.x.toFixed(2)}, ${point.y.toFixed(2)})`, canvas.x, canvas.y - 8);
+      });
+    }
+
+    // Draw min/max points
+    if (analysisOptions.showMinMax) {
+      computedMinMax.forEach(point => {
+        const canvas = dataToCanvas(point.x, point.y);
+        ctx.fillStyle = point.type === 'max' ? '#10b981' : '#f59e0b';
+        ctx.beginPath();
+        if (point.type === 'max') {
+          // Triangle pointing up
+          ctx.moveTo(canvas.x, canvas.y - 8);
+          ctx.lineTo(canvas.x - 6, canvas.y + 4);
+          ctx.lineTo(canvas.x + 6, canvas.y + 4);
+        } else {
+          // Triangle pointing down
+          ctx.moveTo(canvas.x, canvas.y + 8);
+          ctx.lineTo(canvas.x - 6, canvas.y - 4);
+          ctx.lineTo(canvas.x + 6, canvas.y - 4);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+    }
+
+    // Draw critical points
+    if (calculusOptions.showCriticalPoints) {
+      computedCriticalPoints.forEach(point => {
+        const canvas = dataToCanvas(point.x, point.y);
+        ctx.fillStyle = point.type === 'max' ? '#10b981' : point.type === 'min' ? '#f59e0b' : '#8b5cf6';
+        ctx.beginPath();
+        
+        if (point.type === 'max') {
+          // Triangle up
+          ctx.moveTo(canvas.x, canvas.y - 8);
+          ctx.lineTo(canvas.x - 6, canvas.y + 4);
+          ctx.lineTo(canvas.x + 6, canvas.y + 4);
+        } else if (point.type === 'min') {
+          // Triangle down
+          ctx.moveTo(canvas.x, canvas.y + 8);
+          ctx.lineTo(canvas.x - 6, canvas.y - 4);
+          ctx.lineTo(canvas.x + 6, canvas.y - 4);
+        } else {
+          // Diamond for inflection
+          ctx.moveTo(canvas.x, canvas.y - 6);
+          ctx.lineTo(canvas.x + 6, canvas.y);
+          ctx.lineTo(canvas.x, canvas.y + 6);
+          ctx.lineTo(canvas.x - 6, canvas.y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+    }
+
+    // Draw data points overlay
+    if (analysisOptions.showDataPoints) {
+      dataPoints.forEach(point => {
+        const canvas = dataToCanvas(point.x, point.y);
+        ctx.fillStyle = '#06b6d4';
+        ctx.beginPath();
+        ctx.arc(canvas.x, canvas.y, 5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+    }
+
+    // Draw coordinate display on hover
+    if (analysisOptions.showCoordinates && hoveredPoint) {
+      const canvas = dataToCanvas(hoveredPoint.x, hoveredPoint.y);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.fillRect(canvas.x - 40, canvas.y - 30, 80, 20);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`(${hoveredPoint.x.toFixed(2)}, ${hoveredPoint.y.toFixed(2)})`, canvas.x, canvas.y - 20);
+    }
+
     // Draw origin label
     if (xMin <= 0 && xMax >= 0 && yMin <= 0 && yMax >= 0) {
       const origin = dataToCanvas(0, 0);
@@ -546,7 +911,11 @@ export default function GraphCalculator() {
       ctx.textBaseline = 'top';
       ctx.fillText('0', origin.x - 5, origin.y + 5);
     }
-  }, [expressions, xMin, xMax, yMin, yMax, dataToCanvas, paramValues]);
+  }, [
+    expressions, xMin, xMax, yMin, yMax, dataToCanvas, paramValues,
+    calculusOptions, analysisOptions, computedIntersections, computedCriticalPoints, computedMinMax,
+    dataPoints, hoveredPoint
+  ]);
 
   useEffect(() => {
     draw();
@@ -618,16 +987,36 @@ export default function GraphCalculator() {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     
+    const coords = getCanvasCoords(e);
+    if (!coords) return;
+
+    // If in add data point mode, add point instead of dragging
+    if (addDataPointMode) {
+      const dataCoords = canvasToData(coords.x, coords.y);
+      setDataPoints(prev => [...prev, { x: dataCoords.x, y: dataCoords.y }]);
+      return;
+    }
+    
     setIsDragging(true);
     setDragStart({ x: e.clientX, y: e.clientY });
     setViewStart({ xMin, xMax, yMin, yMax });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
+
+    const coords = getCanvasCoords(e);
+    if (!coords) return;
+
+    // Update hovered point for coordinate display
+    if (analysisOptions.showCoordinates) {
+      const dataCoords = canvasToData(coords.x, coords.y);
+      setHoveredPoint(dataCoords);
+    }
+
+    // Handle dragging
+    if (!isDragging) return;
 
     const dx = e.clientX - dragStart.x;
     const dy = e.clientY - dragStart.y;
@@ -643,6 +1032,11 @@ export default function GraphCalculator() {
 
   const handleMouseUp = () => {
     setIsDragging(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+    setHoveredPoint(null);
   };
 
   // Get canvas coordinates with scaling
@@ -864,6 +1258,105 @@ export default function GraphCalculator() {
             </p>
           </div>
 
+          {/* Data Points Management */}
+          {analysisOptions.showDataPoints && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                Data Points ({dataPoints.length})
+              </h3>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {dataPoints.map((point, index) => (
+                  <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded text-xs">
+                    <span className="text-gray-600">
+                      ({point.x.toFixed(2)}, {point.y.toFixed(2)})
+                    </span>
+                    <button
+                      onClick={() => setDataPoints(prev => prev.filter((_, i) => i !== index))}
+                      className="text-red-500 hover:text-red-700"
+                      title="Delete"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {dataPoints.length === 0 && (
+                  <p className="text-xs text-gray-400 italic">No data points yet</p>
+                )}
+              </div>
+              <div className="mt-2 space-y-2">
+                <button
+                  onClick={() => {
+                    const x = prompt('Enter x value:');
+                    const y = prompt('Enter y value:');
+                    if (x !== null && y !== null) {
+                      const xVal = parseFloat(x);
+                      const yVal = parseFloat(y);
+                      if (!isNaN(xVal) && !isNaN(yVal)) {
+                        setDataPoints(prev => [...prev, { x: xVal, y: yVal }]);
+                      }
+                    }
+                  }}
+                  className="w-full px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                >
+                  + Add Manually
+                </button>
+                <label className="block">
+                  <input
+                    type="file"
+                    accept=".csv,.json"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        const text = event.target?.result as string;
+                        try {
+                          if (file.name.endsWith('.csv')) {
+                            const lines = text.split('\n').filter(l => l.trim());
+                            const points: DataPoint[] = [];
+                            for (let i = 1; i < lines.length; i++) {
+                              const [x, y] = lines[i].split(',').map(v => parseFloat(v.trim()));
+                              if (!isNaN(x) && !isNaN(y)) {
+                                points.push({ x, y });
+                              }
+                            }
+                            setDataPoints(prev => [...prev, ...points]);
+                          } else if (file.name.endsWith('.json')) {
+                            const data = JSON.parse(text);
+                            if (Array.isArray(data)) {
+                              const points = data.map((p: any) => ({
+                                x: parseFloat(p.x),
+                                y: parseFloat(p.y),
+                                label: p.label,
+                              })).filter((p: any) => !isNaN(p.x) && !isNaN(p.y));
+                              setDataPoints(prev => [...prev, ...points]);
+                            }
+                          }
+                        } catch (err) {
+                          alert('Error parsing file');
+                        }
+                      };
+                      reader.readAsText(file);
+                    }}
+                    className="hidden"
+                  />
+                  <span className="w-full px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors cursor-pointer block text-center">
+                    Import CSV/JSON
+                  </span>
+                </label>
+                {dataPoints.length > 0 && (
+                  <button
+                    onClick={() => setDataPoints([])}
+                    className="w-full px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Function Reference */}
           <div className="mt-4 pt-4 border-t border-gray-200">
             <h3 className="text-sm font-semibold text-gray-700 mb-2">Math Functions</h3>
@@ -890,6 +1383,120 @@ export default function GraphCalculator() {
 
       {/* Canvas Area */}
       <div className="flex-1 flex flex-col items-center justify-center min-w-0 min-h-0">
+        {/* Toolbar */}
+        <div className="w-full max-w-[700px] mb-3 bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+          <div className="space-y-4">
+            {/* Data Analysis Section */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Data Analysis</h4>
+              <div className="flex flex-wrap gap-3 items-center">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={analysisOptions.showIntersections}
+                    onChange={(e) => setAnalysisOptions(prev => ({ ...prev, showIntersections: e.target.checked }))}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">Intersections</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={analysisOptions.showCoordinates}
+                    onChange={(e) => setAnalysisOptions(prev => ({ ...prev, showCoordinates: e.target.checked }))}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">Coordinates</span>
+                </label>
+                <button
+                  onClick={() => setShowTableModal(true)}
+                  className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors font-medium"
+                >
+                  Generate Table
+                </button>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={analysisOptions.showDataPoints}
+                    onChange={(e) => setAnalysisOptions(prev => ({ ...prev, showDataPoints: e.target.checked }))}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">Data Points</span>
+                </label>
+                <button
+                  onClick={() => setAddDataPointMode(!addDataPointMode)}
+                  className={`px-3 py-1.5 text-sm rounded transition-colors font-medium ${
+                    addDataPointMode
+                      ? 'bg-green-500 text-white hover:bg-green-600'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {addDataPointMode ? '✓ Click to Add' : '+ Add Point'}
+                </button>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={analysisOptions.showMinMax}
+                    onChange={(e) => setAnalysisOptions(prev => ({ ...prev, showMinMax: e.target.checked }))}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">Min/Max</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Calculus Section */}
+            <div className="border-t border-gray-200 pt-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Calculus</h4>
+              <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-700 font-medium">Expression:</label>
+                  <select
+                    value={calculusOptions.selectedExpression || ''}
+                    onChange={(e) => setCalculusOptions(prev => ({ ...prev, selectedExpression: e.target.value || null }))}
+                    className="text-sm border border-gray-300 rounded px-3 py-1.5 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 font-medium"
+                  >
+                    <option value="" className="text-gray-500">Select expression</option>
+                    {expressions.filter(e => e.visible && e.text.trim()).map(expr => (
+                      <option key={expr.id} value={expr.label.toLowerCase()} className="text-gray-900">{expr.label}: {expr.text}</option>
+                    ))}
+                  </select>
+                </div>
+                <label className={`flex items-center gap-2 cursor-pointer ${!calculusOptions.selectedExpression ? 'opacity-50' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={calculusOptions.showDerivative}
+                    onChange={(e) => setCalculusOptions(prev => ({ ...prev, showDerivative: e.target.checked }))}
+                    disabled={!calculusOptions.selectedExpression}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed"
+                  />
+                  <span className="text-sm text-gray-700">Derivative</span>
+                </label>
+                <label className={`flex items-center gap-2 cursor-pointer ${!calculusOptions.selectedExpression ? 'opacity-50' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={calculusOptions.showIntegral}
+                    onChange={(e) => setCalculusOptions(prev => ({ ...prev, showIntegral: e.target.checked }))}
+                    disabled={!calculusOptions.selectedExpression}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed"
+                  />
+                  <span className="text-sm text-gray-700">Integral</span>
+                </label>
+                <label className={`flex items-center gap-2 cursor-pointer ${!calculusOptions.selectedExpression ? 'opacity-50' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={calculusOptions.showCriticalPoints}
+                    onChange={(e) => setCalculusOptions(prev => ({ ...prev, showCriticalPoints: e.target.checked }))}
+                    disabled={!calculusOptions.selectedExpression}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed"
+                  />
+                  <span className="text-sm text-gray-700">Critical Points</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <canvas
           ref={canvasRef}
           width={width}
@@ -898,7 +1505,7 @@ export default function GraphCalculator() {
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
           className="border border-gray-300 rounded-lg bg-white shadow-md cursor-grab active:cursor-grabbing"
           style={{
             width: '100%',
@@ -912,6 +1519,140 @@ export default function GraphCalculator() {
           x: [{xMin.toFixed(1)}, {xMax.toFixed(1)}] • y: [{yMin.toFixed(1)}, {yMax.toFixed(1)}]
         </p>
       </div>
+
+      {/* Table of Values Modal */}
+      {showTableModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-800">Table of Values</h3>
+              <button
+                onClick={() => setShowTableModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex gap-4 items-center">
+                <label className="text-sm font-medium text-gray-700">
+                  Expression:
+                  <select
+                    value={tableExpression || ''}
+                    onChange={(e) => setTableExpression(e.target.value || null)}
+                    className="ml-2 border border-gray-300 rounded px-3 py-1.5 bg-white text-gray-900 font-medium min-w-[200px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="" className="text-gray-500">Select expression</option>
+                    {expressions.filter(e => e.visible && e.text.trim()).map(expr => (
+                      <option key={expr.id} value={expr.label.toLowerCase()} className="text-gray-900">
+                        {expr.label}: {expr.text}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="flex gap-4 items-center">
+                <label className="text-sm font-medium text-gray-700">
+                  X Range:
+                  <input
+                    type="number"
+                    value={tableRange.min}
+                    onChange={(e) => setTableRange(prev => ({ ...prev, min: parseFloat(e.target.value) || 0 }))}
+                    className="ml-2 w-20 border border-gray-300 rounded px-2 py-1"
+                    step="0.1"
+                  />
+                  to
+                  <input
+                    type="number"
+                    value={tableRange.max}
+                    onChange={(e) => setTableRange(prev => ({ ...prev, max: parseFloat(e.target.value) || 0 }))}
+                    className="ml-2 w-20 border border-gray-300 rounded px-2 py-1"
+                    step="0.1"
+                  />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Step:
+                  <input
+                    type="number"
+                    value={tableRange.step}
+                    onChange={(e) => setTableRange(prev => ({ ...prev, step: parseFloat(e.target.value) || 0.5 }))}
+                    className="ml-2 w-20 border border-gray-300 rounded px-2 py-1"
+                    step="0.1"
+                    min="0.1"
+                  />
+                </label>
+                <button
+                  onClick={() => {
+                    if (!tableExpression) return;
+                    const expr = expressions.find(e => e.label.toLowerCase() === tableExpression);
+                    if (!expr) return;
+
+                    const exprValues: Record<string, number> = {};
+                    const allValues = evaluateAllExpressions(expressions, 0, paramValues);
+                    Object.keys(allValues).forEach(key => {
+                      if (allValues[key] !== null) {
+                        exprValues[key] = allValues[key]!;
+                      }
+                    });
+
+                    const data: Array<{x: number, y: number}> = [];
+                    for (let x = tableRange.min; x <= tableRange.max; x += tableRange.step) {
+                      const y = evaluateExpression(expr.text, x, paramValues, exprValues);
+                      if (y !== null) {
+                        data.push({ x, y });
+                      }
+                    }
+                    setTableData(data);
+                  }}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                >
+                  Generate
+                </button>
+              </div>
+
+              {tableData.length > 0 && (
+                <>
+                  <div className="border border-gray-300 rounded max-h-96 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-100 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2 text-left border-b">x</th>
+                          <th className="px-4 py-2 text-left border-b">y</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tableData.map((row, i) => (
+                          <tr key={i} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 border-b">{row.x.toFixed(3)}</td>
+                            <td className="px-4 py-2 border-b">{row.y.toFixed(3)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const csv = 'x,y\n' + tableData.map(r => `${r.x},${r.y}`).join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `table_${tableExpression}_${Date.now()}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                  >
+                    Export CSV
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
