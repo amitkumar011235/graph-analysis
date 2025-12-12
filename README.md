@@ -1,3 +1,5 @@
+NOTE -  This is totally vibe coded .
+
 # DNN Visualizer
 
 An interactive web application for understanding deep neural networks through real-time visualization.
