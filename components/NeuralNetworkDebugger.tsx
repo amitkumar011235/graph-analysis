@@ -400,6 +400,131 @@ export default function NeuralNetworkDebugger() {
     setDataPoints(points);
   };
 
+  const generateExponentialData = () => {
+    const points: DataPoint[] = [];
+    for (let i = 0; i < 40; i++) {
+      const x = -2 + (i / 39) * 4;
+      const y = Math.exp(x) * 0.5 + (Math.random() - 0.5) * 0.5;
+      points.push({ x, y });
+    }
+    setDataPoints(points);
+  };
+
+  const generateCubicData = () => {
+    const points: DataPoint[] = [];
+    for (let i = 0; i < 50; i++) {
+      const x = -3 + (i / 49) * 6;
+      const y = 0.1 * x * x * x - 0.5 * x + (Math.random() - 0.5) * 1;
+      points.push({ x, y });
+    }
+    setDataPoints(points);
+  };
+
+  const generateStepData = () => {
+    const points: DataPoint[] = [];
+    for (let i = 0; i < 50; i++) {
+      const x = -5 + (i / 49) * 10;
+      const baseY = x < -2 ? -2 : x < 0 ? 0 : x < 2 ? 2 : 4;
+      const y = baseY + (Math.random() - 0.5) * 0.5;
+      points.push({ x, y });
+    }
+    setDataPoints(points);
+  };
+
+  const generateCircleData = () => {
+    const points: DataPoint[] = [];
+    for (let i = 0; i < 50; i++) {
+      const angle = (i / 49) * Math.PI * 2;
+      const radius = 3 + (Math.random() - 0.5) * 0.5;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+      points.push({ x, y });
+    }
+    setDataPoints(points);
+  };
+
+  const generateSpiralData = () => {
+    const points: DataPoint[] = [];
+    for (let i = 0; i < 60; i++) {
+      const t = (i / 59) * 3 * Math.PI;
+      const radius = 0.5 + t * 0.3;
+      const x = Math.cos(t) * radius + (Math.random() - 0.5) * 0.3;
+      const y = Math.sin(t) * radius + (Math.random() - 0.5) * 0.3;
+      points.push({ x, y });
+    }
+    setDataPoints(points);
+  };
+
+  const generateGaussianClusters = () => {
+    const points: DataPoint[] = [];
+    // Cluster 1 at (-2, -2)
+    for (let i = 0; i < 20; i++) {
+      const x = -2 + (Math.random() - 0.5) * 2;
+      const y = -2 + (Math.random() - 0.5) * 2;
+      points.push({ x, y });
+    }
+    // Cluster 2 at (2, 2)
+    for (let i = 0; i < 20; i++) {
+      const x = 2 + (Math.random() - 0.5) * 2;
+      const y = 2 + (Math.random() - 0.5) * 2;
+      points.push({ x, y });
+    }
+    // Cluster 3 at (0, 3)
+    for (let i = 0; i < 20; i++) {
+      const x = 0 + (Math.random() - 0.5) * 2;
+      const y = 3 + (Math.random() - 0.5) * 2;
+      points.push({ x, y });
+    }
+    setDataPoints(points);
+  };
+
+  const generateOutlierData = () => {
+    const points: DataPoint[] = [];
+    // Main linear trend
+    for (let i = 0; i < 35; i++) {
+      const x = -4 + (i / 34) * 8;
+      const y = 0.5 * x + 1 + (Math.random() - 0.5) * 0.5;
+      points.push({ x, y });
+    }
+    // Add outliers
+    points.push({ x: -3, y: 5 });
+    points.push({ x: 2, y: -4 });
+    points.push({ x: 0, y: 6 });
+    points.push({ x: 3, y: -3 });
+    points.push({ x: -2, y: -5 });
+    setDataPoints(points);
+  };
+
+  const generateTanhData = () => {
+    const points: DataPoint[] = [];
+    for (let i = 0; i < 50; i++) {
+      const x = -5 + (i / 49) * 10;
+      const y = 3 * Math.tanh(x) + (Math.random() - 0.5) * 0.3;
+      points.push({ x, y });
+    }
+    setDataPoints(points);
+  };
+
+  const generateSigmoidData = () => {
+    const points: DataPoint[] = [];
+    for (let i = 0; i < 50; i++) {
+      const x = -5 + (i / 49) * 10;
+      const y = 4 / (1 + Math.exp(-x)) - 2 + (Math.random() - 0.5) * 0.3;
+      points.push({ x, y });
+    }
+    setDataPoints(points);
+  };
+
+  const generateDoubleSineData = () => {
+    const points: DataPoint[] = [];
+    for (let i = 0; i < 60; i++) {
+      const x = -5 + (i / 59) * 10;
+      const y = 2 * Math.sin(x) + Math.sin(2 * x) + (Math.random() - 0.5) * 0.5;
+      points.push({ x, y });
+    }
+    setDataPoints(points);
+  };
+
   const clearAllData = () => {
     setDataPoints([]);
   };
@@ -827,54 +952,124 @@ export default function NeuralNetworkDebugger() {
           {/* Data Generators */}
           <div className="mb-4 border-t pt-4">
             <label className="block text-sm font-semibold text-gray-900 mb-2">Data Generators</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-1.5">
               <button
                 onClick={generateLinearData}
-                className="px-2 py-2 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
-                title="Generate linear data (y = 2x + 3)"
+                className="px-1.5 py-1.5 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                title="y = 2x + 3"
               >
                 Linear
               </button>
               <button
                 onClick={generateNoisyLinearData}
-                className="px-2 py-2 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
-                title="Generate noisy linear data"
+                className="px-1.5 py-1.5 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                title="Linear with noise"
               >
-                Noisy Linear
+                Noisy
+              </button>
+              <button
+                onClick={generateOutlierData}
+                className="px-1.5 py-1.5 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                title="Linear with outliers"
+              >
+                Outliers
               </button>
               <button
                 onClick={generateQuadraticData}
-                className="px-2 py-2 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
-                title="Generate quadratic data"
+                className="px-1.5 py-1.5 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+                title="y = 0.3x² - 2x + 1"
               >
                 Quadratic
               </button>
               <button
-                onClick={generateSineData}
-                className="px-2 py-2 text-xs bg-pink-100 text-pink-700 rounded hover:bg-pink-200 transition-colors"
-                title="Generate sine wave data"
+                onClick={generateCubicData}
+                className="px-1.5 py-1.5 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+                title="y = 0.1x³ - 0.5x"
               >
-                Sine Wave
+                Cubic
+              </button>
+              <button
+                onClick={generateExponentialData}
+                className="px-1.5 py-1.5 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+                title="y = 0.5×e^x"
+              >
+                Exp
+              </button>
+              <button
+                onClick={generateSineData}
+                className="px-1.5 py-1.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                title="y = 3sin(x) + 2"
+              >
+                Sine
+              </button>
+              <button
+                onClick={generateDoubleSineData}
+                className="px-1.5 py-1.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                title="y = 2sin(x) + sin(2x)"
+              >
+                2×Sine
+              </button>
+              <button
+                onClick={generateStepData}
+                className="px-1.5 py-1.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                title="Step function"
+              >
+                Step
+              </button>
+              <button
+                onClick={generateSigmoidData}
+                className="px-1.5 py-1.5 text-xs bg-pink-100 text-pink-700 rounded hover:bg-pink-200 transition-colors"
+                title="Sigmoid curve"
+              >
+                Sigmoid
+              </button>
+              <button
+                onClick={generateTanhData}
+                className="px-1.5 py-1.5 text-xs bg-pink-100 text-pink-700 rounded hover:bg-pink-200 transition-colors"
+                title="Tanh curve"
+              >
+                Tanh
+              </button>
+              <button
+                onClick={generateCircleData}
+                className="px-1.5 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors"
+                title="Circle pattern"
+              >
+                Circle
+              </button>
+              <button
+                onClick={generateSpiralData}
+                className="px-1.5 py-1.5 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors"
+                title="Spiral pattern"
+              >
+                Spiral
+              </button>
+              <button
+                onClick={generateGaussianClusters}
+                className="px-1.5 py-1.5 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors"
+                title="3 Gaussian clusters"
+              >
+                Clusters
+              </button>
+              <button
+                onClick={generateXORData}
+                className="px-1.5 py-1.5 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors"
+                title="XOR pattern"
+              >
+                XOR
               </button>
               <button
                 onClick={generateRandomScatteredData}
-                className="px-2 py-2 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors"
-                title="Generate random scattered data"
+                className="px-1.5 py-1.5 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+                title="Random scattered"
               >
                 Random
               </button>
               <button
-                onClick={generateXORData}
-                className="px-2 py-2 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors"
-                title="Generate XOR-like data for classification"
-              >
-                XOR Pattern
-              </button>
-              <button
                 onClick={clearAllData}
                 disabled={dataPoints.length === 0}
-                className="px-2 py-2 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors col-span-2"
-                title="Clear all data points"
+                className="px-1.5 py-1.5 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors col-span-2"
+                title="Clear all"
               >
                 Clear All
               </button>
