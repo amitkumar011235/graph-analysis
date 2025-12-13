@@ -9,8 +9,9 @@ import { DataPoint, LayerConfig, Mode } from '@/lib/types';
 
 // Dynamically import GraphCalculator to avoid SSR issues
 const GraphCalculator = dynamic(() => import('@/components/GraphCalculator'), { ssr: false });
+const LinearRegressionVisualizer = dynamic(() => import('@/components/LinearRegressionVisualizer'), { ssr: false });
 
-type AppTab = 'neural-network' | 'graph-calculator';
+type AppTab = 'neural-network' | 'graph-calculator' | 'linear-regression';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<AppTab>('neural-network');
@@ -352,6 +353,16 @@ export default function Home() {
           >
             📈 Graph Calculator
           </button>
+          <button
+            onClick={() => setActiveTab('linear-regression')}
+            className={`px-4 py-2 rounded-t-lg font-semibold text-sm transition-colors ${
+              activeTab === 'linear-regression'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+            }`}
+          >
+            📊 Linear Regression
+          </button>
         </div>
         
         {/* Training Progress Display (only show for neural network tab) */}
@@ -478,6 +489,11 @@ export default function Home() {
           className={`absolute inset-0 ${activeTab === 'graph-calculator' ? 'block' : 'hidden'}`}
         >
           <GraphCalculator />
+        </div>
+        <div 
+          className={`absolute inset-0 ${activeTab === 'linear-regression' ? 'block' : 'hidden'}`}
+        >
+          <LinearRegressionVisualizer />
         </div>
       </div>
     </div>

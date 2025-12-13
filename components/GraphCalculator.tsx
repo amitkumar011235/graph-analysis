@@ -313,6 +313,7 @@ export default function GraphCalculator() {
   });
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
   const [hoveredPoint, setHoveredPoint] = useState<{x: number, y: number} | null>(null);
+  const [hoveredDataPoint, setHoveredDataPoint] = useState<{x: number, y: number, index: number} | null>(null);
   const [intersectionPoints, setIntersectionPoints] = useState<IntersectionPoint[]>([]);
   const [criticalPoints, setCriticalPoints] = useState<CriticalPoint[]>([]);
   const [showTableModal, setShowTableModal] = useState(false);
@@ -878,16 +879,60 @@ export default function GraphCalculator() {
 
     // Draw data points overlay
     if (analysisOptions.showDataPoints) {
-      dataPoints.forEach(point => {
+      dataPoints.forEach((point, index) => {
         const canvas = dataToCanvas(point.x, point.y);
-        ctx.fillStyle = '#06b6d4';
+        const isHovered = hoveredDataPoint?.index === index;
+        
+        // Draw larger circle when hovered
+        const radius = isHovered ? 8 : 5;
+        ctx.fillStyle = isHovered ? '#0891b2' : '#06b6d4';
         ctx.beginPath();
-        ctx.arc(canvas.x, canvas.y, 5, 0, 2 * Math.PI);
+        ctx.arc(canvas.x, canvas.y, radius, 0, 2 * Math.PI);
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = isHovered ? 3 : 2;
         ctx.stroke();
       });
+      
+      // Draw hover tooltip for data point
+      if (hoveredDataPoint) {
+        const canvas = dataToCanvas(hoveredDataPoint.x, hoveredDataPoint.y);
+        const hoverRadius = 8; // Radius when hovered
+        
+        // Draw tooltip background
+        const text = `(${hoveredDataPoint.x.toFixed(2)}, ${hoveredDataPoint.y.toFixed(2)})`;
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        const metrics = ctx.measureText(text);
+        const textWidth = metrics.width;
+        const textHeight = 16;
+        const padding = 8;
+        
+        // Position tooltip above the point
+        const tooltipX = canvas.x;
+        const tooltipY = canvas.y - hoverRadius - padding - textHeight / 2;
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fillRect(
+          tooltipX - textWidth / 2 - padding,
+          tooltipY - textHeight / 2,
+          textWidth + padding * 2,
+          textHeight + padding
+        );
+        
+        // Draw tooltip text
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(text, tooltipX, tooltipY + textHeight / 2);
+        
+        // Draw connecting line
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(canvas.x, canvas.y - hoverRadius);
+        ctx.lineTo(tooltipX, tooltipY + textHeight / 2);
+        ctx.stroke();
+      }
     }
 
     // Draw coordinate display on hover
@@ -914,7 +959,7 @@ export default function GraphCalculator() {
   }, [
     expressions, xMin, xMax, yMin, yMax, dataToCanvas, paramValues,
     calculusOptions, analysisOptions, computedIntersections, computedCriticalPoints, computedMinMax,
-    dataPoints, hoveredPoint
+    dataPoints, hoveredPoint, hoveredDataPoint
   ]);
 
   useEffect(() => {
@@ -1009,10 +1054,36 @@ export default function GraphCalculator() {
     const coords = getCanvasCoords(e);
     if (!coords) return;
 
-    // Update hovered point for coordinate display
-    if (analysisOptions.showCoordinates) {
+    // Check if hovering over a data point (when data points are visible)
+    if (analysisOptions.showDataPoints && dataPoints.length > 0) {
+      const hoverRadius = 10; // Pixel radius for hover detection
+      let foundDataPoint: {x: number, y: number, index: number} | null = null;
+      
+      for (let i = 0; i < dataPoints.length; i++) {
+        const point = dataPoints[i];
+        const canvasPos = dataToCanvas(point.x, point.y);
+        const distance = Math.sqrt(
+          Math.pow(coords.x - canvasPos.x, 2) + 
+          Math.pow(coords.y - canvasPos.y, 2)
+        );
+        
+        if (distance <= hoverRadius) {
+          foundDataPoint = { x: point.x, y: point.y, index: i };
+          break;
+        }
+      }
+      
+      setHoveredDataPoint(foundDataPoint);
+    } else {
+      setHoveredDataPoint(null);
+    }
+
+    // Update hovered point for coordinate display (only if not hovering over a data point)
+    if (analysisOptions.showCoordinates && !hoveredDataPoint) {
       const dataCoords = canvasToData(coords.x, coords.y);
       setHoveredPoint(dataCoords);
+    } else if (hoveredDataPoint) {
+      setHoveredPoint(null);
     }
 
     // Handle dragging
@@ -1037,6 +1108,7 @@ export default function GraphCalculator() {
   const handleMouseLeave = () => {
     setIsDragging(false);
     setHoveredPoint(null);
+    setHoveredDataPoint(null);
   };
 
   // Get canvas coordinates with scaling
