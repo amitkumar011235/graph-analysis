@@ -19,11 +19,6 @@ export interface LayerConfig {
   activation: ActivationType;
 }
 
-export interface NetworkConfig {
-  layers: LayerConfig[];
-  learningRate: number;
-  epochs: number;
-}
 
 export interface TrainingState {
   isTraining: boolean;
@@ -46,5 +41,50 @@ export interface ActivationFunction {
 export interface LossFunction {
   compute(predictions: Tensor, targets: Tensor): number;
   gradient(predictions: Tensor, targets: Tensor): Tensor;
+}
+
+// Debug-related types
+export type OptimizerType = 'sgd' | 'adam' | 'rmsprop';
+
+export interface NetworkConfig {
+  inputSize: number;
+  outputSize: number;
+  layers: LayerConfig[];
+  lossFunction: LossType;
+  optimizer: OptimizerType;
+  learningRate: number;
+  epochs: number;
+}
+
+export interface ComputationDetail {
+  formula: string;
+  description: string;
+  inputs: { name: string; value: Tensor | number[] | number }[];
+  output: Tensor | number[] | number;
+  operation: string;
+  layerIndex?: number;
+}
+
+export interface StepSnapshot {
+  stepType: 'forward' | 'backward' | 'update' | 'loss';
+  layerIndex?: number;
+  networkState: {
+    weights: Tensor[];
+    biases: number[][];
+    activations?: Tensor[];
+  };
+  computation: ComputationDetail;
+  timestamp: number;
+  stepNumber: number;
+}
+
+export interface NetworkState {
+  weights: Tensor[];
+  biases: number[][];
+  activations?: Tensor[];
+  gradients?: {
+    weightGrads: Tensor[];
+    biasGrads: number[][];
+  };
 }
 

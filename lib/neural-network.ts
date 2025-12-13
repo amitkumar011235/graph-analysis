@@ -73,6 +73,7 @@ export class Layer {
   weights: Tensor;
   bias: number[];
   activation: ActivationFunction;
+  activationType: string; // Store activation type for debugging
   inputSize: number;
   outputSize: number;
   
@@ -83,6 +84,7 @@ export class Layer {
   constructor(inputSize: number, outputSize: number, activationType: string) {
     this.inputSize = inputSize;
     this.outputSize = outputSize;
+    this.activationType = activationType;
     this.activation = getActivation(activationType);
     
     // Initialize weights (Xavier/Glorot for most, He for ReLU)
@@ -278,6 +280,49 @@ export class Network {
     }
     
     return grid;
+  }
+
+  // Step-by-step execution methods for debugging
+  getLayerWeights(layerIndex: number): Tensor {
+    return this.layers[layerIndex].weights;
+  }
+
+  getLayerBias(layerIndex: number): number[] {
+    return this.layers[layerIndex].bias;
+  }
+
+  getLayerActivationType(layerIndex: number): string {
+    return this.layers[layerIndex].activationType;
+  }
+
+  // Forward pass for a single layer (step-by-step)
+  forwardLayer(layerIndex: number, input: Tensor): Tensor {
+    return this.layers[layerIndex].forward(input);
+  }
+
+  // Get all layer weights and biases (for state snapshot)
+  getState(): { weights: Tensor[]; biases: number[][] } {
+    return {
+      weights: this.layers.map(l => l.weights),
+      biases: this.layers.map(l => l.bias),
+    };
+  }
+
+  // Get current gradients (for debugging)
+  getGradients(): { weightGrads: Tensor[]; biasGrads: number[][] } | null {
+    const weightGrads: Tensor[] = [];
+    const biasGrads: number[][] = [];
+
+    for (const layer of this.layers) {
+      if (layer.weightGrad && layer.biasGrad) {
+        weightGrads.push(layer.weightGrad);
+        biasGrads.push(layer.biasGrad);
+      } else {
+        return null; // Gradients not computed yet
+      }
+    }
+
+    return { weightGrads, biasGrads };
   }
 }
 

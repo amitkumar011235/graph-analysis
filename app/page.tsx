@@ -7,9 +7,10 @@ import ParameterControls from '@/components/ParameterControls';
 import { Network } from '@/lib/neural-network';
 import { DataPoint, LayerConfig, Mode } from '@/lib/types';
 
-// Dynamically import GraphCalculator to avoid SSR issues
+// Dynamically import components to avoid SSR issues
 const GraphCalculator = dynamic(() => import('@/components/GraphCalculator'), { ssr: false });
 const LinearRegressionVisualizer = dynamic(() => import('@/components/LinearRegressionVisualizer'), { ssr: false });
+const NeuralNetworkDebugger = dynamic(() => import('@/components/NeuralNetworkDebugger'), { ssr: false });
 
 type AppTab = 'neural-network' | 'graph-calculator' | 'linear-regression';
 
@@ -416,72 +417,7 @@ export default function Home() {
         <div 
           className={`absolute inset-0 ${activeTab === 'neural-network' ? 'block' : 'hidden'}`}
         >
-          <div className="flex gap-3 h-full">
-            {/* Left Sidebar - Parameters (compact) */}
-            <div className="w-64 flex-shrink-0 overflow-y-auto">
-              <ParameterControls
-                mode={mode}
-                onModeChange={setMode}
-                layers={layers}
-                onLayersChange={setLayers}
-                learningRate={learningRate}
-                onLearningRateChange={setLearningRate}
-                epochs={epochs}
-                onEpochsChange={setEpochs}
-                onTrain={trainNetwork}
-                onReset={handleReset}
-                isTraining={isTraining}
-                autoTrain={autoTrain}
-                onAutoTrainChange={setAutoTrain}
-                currentLoss={currentLoss}
-              />
-            </div>
-
-            {/* Center - Canvas (takes all remaining space) */}
-            <div className="flex-1 flex flex-col items-center justify-center min-w-0 min-h-0">
-              {/* Data Generation Controls */}
-              <div className="flex items-center gap-2 mb-2 flex-wrap justify-center">
-                <span className="text-xs text-gray-500">Add random points:</span>
-                {[10, 50, 100, 200, 500].map((count) => (
-                  <button
-                    key={count}
-                    onClick={() => generateRandomData(count)}
-                    disabled={isTraining}
-                    className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {count}
-                  </button>
-                ))}
-                <button
-                  onClick={clearData}
-                  disabled={isTraining || dataPoints.length === 0}
-                  className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Clear All
-                </button>
-                <span className="text-xs text-gray-400 ml-2">
-                  ({dataPoints.length} points)
-                </span>
-              </div>
-              
-              <DataCanvas
-                dataPoints={dataPoints}
-                onDataPointsChange={setDataPoints}
-                mode={mode}
-                predictionCurve={predictionCurve}
-                decisionBoundary={decisionBoundary}
-                xMin={bounds.xMin}
-                xMax={bounds.xMax}
-                yMin={bounds.yMin}
-                yMax={bounds.yMax}
-              />
-              {dataPoints.length === 0 && (
-                <div className="mt-2 text-sm text-gray-500 text-center">
-                  Click on the canvas to add data points
-                </div>
-              )}
-            </div>
-          </div>
+          <NeuralNetworkDebugger />
         </div>
 
         {/* Graph Calculator Tab - Always mounted, hidden when not active */}
